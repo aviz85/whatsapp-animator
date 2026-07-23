@@ -350,6 +350,10 @@
       <button class="btn-sec" id="btnStatic">תצוגה מלאה</button>
       <button class="btn-warn" id="btnStop">⏹ עצור</button>
       <button class="btn-sec" id="btnPng">📸 הורד PNG</button>
+      <button class="btn-primary" id="btnVideo">🎥 ייצא וידאו</button>
+    </div>
+    <div class="help" id="videoHint" style="display:none">
+      🎥 בחלון שנפתח בחרו <b>"הכרטיסייה הזו" (This Tab)</b> ואשרו שיתוף — ההקלטה תתפוס רק את הטלפון, תריץ את האנימציה ותוריד קובץ <code>webm</code> בסיום.
     </div>
     <div class="speed-row">
       <span>מהירות</span>
@@ -427,7 +431,7 @@ const MIC_BADGE = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a
 const PERSON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm0 2.2c-3.6 0-9 1.8-9 5.4V22h18v-2.4c0-3.6-5.4-5.4-9-5.4z"/></svg>`;
 
 /* ---- צלילים (WebAudio, בלי קבצים) ---- */
-let audioCtx = null;
+let audioCtx = null, audioDest = null;
 function beep(freqs, dur = 0.09, gainV = 0.12) {
   if (!$('soundOn').checked) return;
   try {
@@ -438,7 +442,9 @@ function beep(freqs, dur = 0.09, gainV = 0.12) {
       g.gain.setValueAtTime(0, audioCtx.currentTime + i * dur);
       g.gain.linearRampToValueAtTime(gainV, audioCtx.currentTime + i * dur + 0.015);
       g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (i + 1) * dur);
-      o.connect(g).connect(audioCtx.destination);
+      g.connect(audioCtx.destination);
+      if (audioDest) g.connect(audioDest);           /* מזרים גם להקלטת הווידאו */
+      o.connect(g);
       o.start(audioCtx.currentTime + i * dur); o.stop(audioCtx.currentTime + (i + 1) * dur + 0.05);
     });
   } catch (e) { /* אין אודיו — ממשיכים בשקט */ }
@@ -622,7 +628,67 @@ async function exportPNG() {
   a.click();
 }
 
+/* ============ ייצוא וידאו (Region Capture + MediaRecorder) ============ */
+let recorder = null, recStream = null;
+
+async function exportVideo() {
+  if (recorder) return; /* הקלטה כבר רצה */
+  const btn = $('btnVideo');
+  $('videoHint').style.display = 'block';
+  try {
+    /* בקשת שיתוף הכרטיסייה הנוכחית */
+    recStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 60 },
+      audio: false,
+      preferCurrentTab: true
+    });
+    /* חיתוך לאזור הטלפון בלבד (Chrome 104+) */
+    const track = recStream.getVideoTracks()[0];
+    if (window.CropTarget && track.cropTo) {
+      const target = await CropTarget.fromElement($('phoneFrame'));
+      await track.cropTo(target);
+    }
+    /* צלילי האנימציה נכנסים לפסקול */
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    audioDest = audioCtx.createMediaStreamDestination();
+    const mixed = new MediaStream([...recStream.getVideoTracks(), ...audioDest.stream.getAudioTracks()]);
+
+    const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    recorder = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    const done = new Promise(res => recorder.onstop = res);
+    recorder.start();
+    btn.textContent = '⏺ מקליט...';
+
+    /* רגע התייצבות, ואז מריצים את האנימציה מההתחלה */
+    await new Promise(r => setTimeout(r, 600));
+    stopPlayback();
+    await play();
+    /* מחכים שגם הווי האחרון יהפוך כחול + סוף נקי */
+    await new Promise(r => setTimeout(r, 2500 / speedFactor()));
+
+    recorder.stop();
+    await done;
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.download = 'whatsapp-chat.webm';
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    if (err && err.name !== 'NotAllowedError') alert('ייצוא הווידאו נכשל: ' + err.message);
+  } finally {
+    if (recStream) recStream.getTracks().forEach(t => t.stop());
+    recorder = null; recStream = null; audioDest = null;
+    btn.textContent = '🎥 ייצא וידאו';
+    $('videoHint').style.display = 'none';
+  }
+}
+
 /* ============ חיבור הפקדים ============ */
+$('btnVideo').onclick = exportVideo;
 $('btnStatic').onclick = renderStatic;
 $('btnPlay').onclick = () => { stopPlayback(); play(); };
 $('btnStop').onclick = stopPlayback;
