@@ -202,6 +202,15 @@
   #phone[dir="rtl"] .out .tail svg { transform: scaleX(-1); }
   #phone[dir="ltr"] .in  .tail svg { transform: scaleX(-1); }
 
+  /* קבוצות: שם שולח צבעוני + אווטאר קטן */
+  .sender-name { font-size: 12.8px; font-weight: 600; margin-bottom: 2px; unicode-bidi: plaintext; }
+  .g-avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto;
+    display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 600;
+    margin-inline-end: 7px; align-self: flex-start; margin-top: 1px;
+  }
+  .g-spacer { width: 35px; flex: 0 0 auto; }
+
   .msg-text { white-space: pre-wrap; word-wrap: break-word; unicode-bidi: plaintext; }
   .msg-text.emoji-only { font-size: 32px; line-height: 38px; }
   .meta {
@@ -342,7 +351,8 @@
       <code>&gt;</code> הודעה יוצאת (שלי) &nbsp;·&nbsp; <code>&lt;</code> הודעה נכנסת<br>
       <code># טקסט</code> תגית תאריך (למשל <code># היום</code>)<br>
       <code>@21:45</code> בסוף שורה — קובע שעה להודעה<br>
-      <code>קול 0:12</code> הודעה קולית &nbsp;·&nbsp; <code>תמונה 1</code> תמונה שהועלתה
+      <code>קול 0:12</code> הודעה קולית &nbsp;·&nbsp; <code>תמונה 1</code> תמונה שהועלתה<br>
+      <b>קבוצה:</b> <code>&lt; דנה: היי</code> — שם שולח לפני נקודתיים. השם יופיע בצבע ייחודי, הכותרת תהפוך לקבוצה אוטומטית (שם איש הקשר = שם הקבוצה)
     </div>
 
     <div class="btns">
@@ -353,7 +363,7 @@
       <button class="btn-primary" id="btnVideo">🎥 ייצא וידאו</button>
     </div>
     <div class="help" id="videoHint" style="display:none">
-      🎥 בחלון שנפתח בחרו <b>"הכרטיסייה הזו" (This Tab)</b> ואשרו שיתוף — ההקלטה תתפוס רק את הטלפון, תריץ את האנימציה ותוריד קובץ <code>webm</code> בסיום.
+      🎥 בחלון שנפתח בחרו <b>"הכרטיסייה הזו" (This Tab)</b> ואשרו שיתוף — ההקלטה תתפוס רק את הטלפון, תריץ את האנימציה ותוריד קובץ <code id="fmtLabel">וידאו</code> בסיום.
     </div>
     <div class="speed-row">
       <span>מהירות</span>
@@ -429,6 +439,7 @@ const TICK2 = `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" strok
 const PLAY_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
 const MIC_BADGE = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.9V21h2v-3.1A7 7 0 0019 11h-2z"/></svg>`;
 const PERSON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm0 2.2c-3.6 0-9 1.8-9 5.4V22h18v-2.4c0-3.6-5.4-5.4-9-5.4z"/></svg>`;
+const GROUP_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 11.2a3.4 3.4 0 100-6.8 3.4 3.4 0 000 6.8zm6.8.4a2.9 2.9 0 100-5.8 2.9 2.9 0 000 5.8zM9 13.1c-2.6 0-7.8 1.3-7.8 3.9V19h15.6v-2c0-2.6-5.2-3.9-7.8-3.9zm6.8.4c-.4 0-.9 0-1.4.1 1.2.8 2 1.9 2 3.4v2h5.4v-1.7c0-2.3-4-3.8-6-3.8z"/></svg>`;
 
 /* ---- צלילים (WebAudio, בלי קבצים) ---- */
 let audioCtx = null, audioDest = null;
@@ -457,6 +468,11 @@ function parseTime(str) { const m = str.match(/^(\d{1,2}):(\d{2})$/); return m ?
 function fmtTime(t) { return `${t.h}:${String(t.mnt).padStart(2, '0')}`; }
 function addMinutes(t, n) { let total = t.h * 60 + t.mnt + n; total %= 1440; return { h: Math.floor(total / 60), mnt: total % 60 }; }
 
+/* צבעי שולחים בקבוצה — דטרמיניסטי לפי שם, כמו בוואטסאפ */
+const SENDER_PALETTE = ['#e542a3', '#1f7aec', '#007a5a', '#c56d00', '#7f66ff', '#dc4437', '#00a5b8', '#8f6c1f'];
+function senderColor(name) { let h = 0; for (const c of name) h = (h * 31 + c.codePointAt(0)) >>> 0; return SENDER_PALETTE[h % SENDER_PALETTE.length]; }
+let groupMode = false, groupSenders = [];
+
 function parseScript() {
   const lines = $('script').value.split('\n');
   let cur = parseTime($('startTime').value.trim()) || { h: 21, mnt: 28 };
@@ -472,13 +488,21 @@ function parseScript() {
     const tm = text.match(/@(\d{1,2}:\d{2})\s*$/);
     if (tm) { cur = parseTime(tm[1]) || cur; text = text.replace(/@\d{1,2}:\d{2}\s*$/, '').trim(); }
     else if (count > 0 && count % 2 === 0) cur = addMinutes(cur, 1);
-    let item = { type: 'msg', side, time: fmtTime(cur), kind: 'text', text };
+    /* קבוצה: "< דנה: היי" — שם שולח לפני נקודתיים */
+    let sender = null;
+    if (side === 'in') {
+      const sm = text.match(/^([^:]{1,30}?):\s+(.+)$/s);
+      if (sm) { sender = sm[1].trim(); text = sm[2].trim(); }
+    }
+    let item = { type: 'msg', side, time: fmtTime(cur), kind: 'text', text, sender };
     const vm = text.match(/^(?:קול|voice)\s+(\d+:\d{2})$/);
     const im = text.match(/^(?:תמונה|image)\s+(\d+)$/);
     if (vm) { item.kind = 'voice'; item.dur = vm[1]; }
     else if (im) { item.kind = 'image'; item.imgIdx = +im[1] - 1; }
     items.push(item); count++;
   }
+  groupSenders = [...new Set(items.filter(i => i.sender).map(i => i.sender))];
+  groupMode = groupSenders.length > 0;
   return items;
 }
 
@@ -489,18 +513,21 @@ function isEmojiOnly(t) {
 }
 function ticksHTML(state) { return `<span class="ticks ${state === 'read' ? 'read' : ''}">${state === 'sent' ? TICK1 : TICK2}</span>`; }
 
-function avatarHTML() {
+function avatarHTML(sender) {
+  if (sender) return `<span class="avatar" style="background:${senderColor(sender)};color:#fff;font-size:17px;font-weight:600;display:grid;place-items:center">${escapeHTML([...sender][0])}</span>`;
   const img = $('headerAvatar').querySelector('img');
   return `<span class="avatar">${img ? `<img src="${img.src}">` : PERSON_SVG}</span>`;
 }
 
 function buildMsg(item, prevItem, opts = {}) {
   const row = document.createElement('div');
-  const firstOfGroup = !prevItem || prevItem.type !== 'msg' || prevItem.side !== item.side;
+  const firstOfGroup = !prevItem || prevItem.type !== 'msg' || prevItem.side !== item.side || prevItem.sender !== item.sender;
   row.className = `msg-row ${item.side}${firstOfGroup ? ' first-of-group' : ''}`;
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   const tickState = opts.tickState || 'read';
+  const senderHTML = (groupMode && item.side === 'in' && item.sender && firstOfGroup)
+    ? `<div class="sender-name" style="color:${senderColor(item.sender)}">${escapeHTML(item.sender)}</div>` : '';
   const metaHTML = `<span class="meta">${item.side === 'out' ? ticksHTML(tickState) : ''}<span>${item.time}</span></span>`;
 
   if (item.kind === 'image' && chatImageURLs[item.imgIdx]) {
@@ -509,21 +536,31 @@ function buildMsg(item, prevItem, opts = {}) {
       <span class="meta-overlay">${item.side === 'out' ? ticksHTML(tickState) : ''}<span>${item.time}</span></span>`;
   } else if (item.kind === 'voice') {
     const bars = Array.from({ length: 28 }, () => `<i style="height:${4 + ((Math.sin(Math.random() * 9) + 1) * 9 | 0)}px"></i>`).join('');
-    bubble.innerHTML = `
+    bubble.innerHTML = `${senderHTML}
       <div class="voice">
         <span class="play">${PLAY_SVG}</span>
         <span class="wave">${bars}</span>
-        <span class="v-avatar">${avatarHTML()}<span class="mic-badge">${MIC_BADGE}</span></span>
+        <span class="v-avatar">${avatarHTML(item.sender)}<span class="mic-badge">${MIC_BADGE}</span></span>
       </div>
       <div class="voice-meta"><span>${item.dur}</span>${metaHTML}</div>`;
   } else {
     const cls = isEmojiOnly(item.text) ? 'msg-text emoji-only' : 'msg-text';
-    bubble.innerHTML = `<span class="${cls}">${escapeHTML(item.text)}</span>${metaHTML}`;
+    bubble.innerHTML = `${senderHTML}<span class="${cls}">${escapeHTML(item.text)}</span>${metaHTML}`;
   }
   if (firstOfGroup && item.kind !== 'image') {
     const tail = document.createElement('span');
     tail.className = 'tail'; tail.innerHTML = TAIL_SVG;
     bubble.appendChild(tail);
+  }
+  /* בקבוצה: אווטאר קטן ליד הודעות נכנסות */
+  if (groupMode && item.side === 'in') {
+    const av = document.createElement('span');
+    if (firstOfGroup && item.sender) {
+      av.className = 'g-avatar';
+      av.style.background = senderColor(item.sender);
+      av.textContent = [...item.sender][0];
+    } else av.className = 'g-spacer';
+    row.appendChild(av);
   }
   row.appendChild(bubble);
   return row;
@@ -549,6 +586,7 @@ function renderStatic() {
   clearChat();
   phone.classList.add('static-mode');
   const items = parseScript();
+  updateHeaderAvatar();
   let prev = null;
   for (const item of items) {
     if (item.type === 'date') { chatArea.appendChild(buildChip(item.text)); prev = item; continue; }
@@ -560,11 +598,20 @@ function renderStatic() {
 }
 
 /* ============ נגינת אנימציה ============ */
-function setHeaderStatus(mode) {
+function setHeaderStatus(mode, sender) {
   const el = $('hdrStatus');
-  if (mode === 'typing') { el.textContent = 'מקליד/ה...'; return; }
+  if (mode === 'typing') { el.textContent = (groupMode && sender ? sender + ' ' : '') + 'מקליד/ה...'; return; }
+  if (groupMode) { el.textContent = ['אתה', ...groupSenders].join(', '); return; }
   const sel = $('statusMode').value;
   el.textContent = sel === 'online' ? 'מחובר/ת' : sel === 'lastseen' ? 'נראה לאחרונה היום ב־14:05' : '';
+}
+
+let avatarUploaded = false;
+function updateHeaderAvatar() {
+  if (avatarUploaded) return; /* תמונה שהועלתה גוברת */
+  $('headerAvatar').innerHTML = groupMode
+    ? GROUP_SVG.replace('<svg ', '<svg style="width:24px;height:24px;margin-top:0" ')
+    : PERSON_SVG;
 }
 
 function stopPlayback() {
@@ -579,6 +626,8 @@ async function play() {
   phone.classList.remove('static-mode');
   playing = true;
   const items = parseScript();
+  updateHeaderAvatar();
+  setHeaderStatus('idle');
   let prev = null;
   const pendingTicks = [];
 
@@ -593,10 +642,12 @@ async function play() {
       /* חיווי הקלדה */
       const typeMs = Math.min(900 + (item.text?.length || 10) * 55, 3200) / speedFactor();
       await sleep(500 / speedFactor()); if (!playing) return;
-      setHeaderStatus('typing');
+      setHeaderStatus('typing', item.sender);
       const typingRow = document.createElement('div');
       typingRow.className = 'msg-row in first-of-group typing-row';
-      typingRow.innerHTML = `<div class="bubble"><span class="typing-bubble"><i></i><i></i><i></i></span></div>`;
+      const typingAvatar = (groupMode && item.sender)
+        ? `<span class="g-avatar" style="background:${senderColor(item.sender)}">${escapeHTML([...item.sender][0])}</span>` : '';
+      typingRow.innerHTML = `${typingAvatar}<div class="bubble"><span class="typing-bubble"><i></i><i></i><i></i></span></div>`;
       chatArea.appendChild(typingRow); scrollBottom();
       await sleep(typeMs); if (!playing) return;
       typingRow.remove();
@@ -631,6 +682,21 @@ async function exportPNG() {
 /* ============ ייצוא וידאו (Region Capture + MediaRecorder) ============ */
 let recorder = null, recStream = null;
 
+/* בחירת פורמט: MP4 ישירות כשהדפדפן תומך (Chrome 126+ / Safari) — בלי ffmpeg ובלי מק. אחרת WebM. */
+function pickRecordingFormat() {
+  const candidates = [
+    { mime: 'video/mp4;codecs=avc1.640028,mp4a.40.2', ext: 'mp4' },
+    { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4' },
+    { mime: 'video/mp4;codecs=avc1,mp4a.40.2',        ext: 'mp4' },
+    { mime: 'video/mp4;codecs=avc1,opus',             ext: 'mp4' },
+    { mime: 'video/mp4',                              ext: 'mp4' },
+    { mime: 'video/webm;codecs=vp9,opus',             ext: 'webm' },
+    { mime: 'video/webm;codecs=vp8,opus',             ext: 'webm' },
+    { mime: 'video/webm',                             ext: 'webm' },
+  ];
+  return candidates.find(c => MediaRecorder.isTypeSupported(c.mime)) || { mime: '', ext: 'webm' };
+}
+
 async function exportVideo() {
   if (recorder) return; /* הקלטה כבר רצה */
   const btn = $('btnVideo');
@@ -653,9 +719,8 @@ async function exportVideo() {
     audioDest = audioCtx.createMediaStreamDestination();
     const mixed = new MediaStream([...recStream.getVideoTracks(), ...audioDest.stream.getAudioTracks()]);
 
-    const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-      .find(m => MediaRecorder.isTypeSupported(m)) || '';
-    recorder = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    const fmt = pickRecordingFormat();
+    recorder = new MediaRecorder(mixed, { mimeType: fmt.mime, videoBitsPerSecond: 8_000_000 });
     const chunks = [];
     recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
     const done = new Promise(res => recorder.onstop = res);
@@ -671,9 +736,9 @@ async function exportVideo() {
 
     recorder.stop();
     await done;
-    const blob = new Blob(chunks, { type: 'video/webm' });
+    const blob = new Blob(chunks, { type: fmt.mime.split(';')[0] || 'video/webm' });
     const a = document.createElement('a');
-    a.download = 'whatsapp-chat.webm';
+    a.download = 'whatsapp-chat.' + fmt.ext;
     a.href = URL.createObjectURL(blob);
     a.click();
     URL.revokeObjectURL(a.href);
@@ -702,6 +767,7 @@ $('statusMode').onchange = () => setHeaderStatus('idle');
 $('clockTime').oninput = e => $('sbClock').textContent = e.target.value;
 $('avatarFile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
+  avatarUploaded = true;
   $('headerAvatar').innerHTML = `<img src="${URL.createObjectURL(f)}">`;
 };
 $('chatImages').onchange = e => {
@@ -710,6 +776,7 @@ $('chatImages').onchange = e => {
 $('showE2E').onchange = renderStatic;
 
 /* פתיחה: תצוגה סטטית של תסריט הדוגמה */
+$('fmtLabel').textContent = pickRecordingFormat().ext;
 renderStatic();
 </script>
 </body>
