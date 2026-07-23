@@ -8,7 +8,9 @@ A pixel-accurate WhatsApp chat simulator & animator in a single HTML file — sc
 
 ## שימוש
 
-פותחים את `index.html` בדפדפן. זהו — אין התקנה, אין שרת, קובץ אחד.
+**גרסה חיה:** https://aviz85.github.io/whatsapp-animator/
+
+או מקומית — פותחים את `index.html` בדפדפן. זהו — אין התקנה, אין שרת, קובץ אחד.
 
 ```bash
 open index.html
