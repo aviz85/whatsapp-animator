@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Animator — סימולטור שיחות</title>
+<style>
+  /* ---------- מעטפת האפליקציה (העורך) ---------- */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #0f172a; color: #e2e8f0; min-height: 100vh;
+  }
+  header.app-header {
+    padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid #1e293b; background: #0b1220;
+  }
+  header.app-header h1 { font-size: 18px; font-weight: 700; color: #f1f5f9; }
+  header.app-header .logo {
+    width: 34px; height: 34px; border-radius: 9px; background: #00a884;
+    display: grid; place-items: center; font-size: 18px;
+  }
+  header.app-header .sub { font-size: 12px; color: #64748b; }
+  .layout { display: flex; gap: 20px; padding: 20px 24px; align-items: flex-start; flex-wrap: wrap; }
+  .panel {
+    flex: 1 1 380px; max-width: 520px; background: #111c30; border: 1px solid #1e293b;
+    border-radius: 14px; padding: 18px;
+  }
+  .panel h2 { font-size: 13px; font-weight: 700; color: #94a3b8; letter-spacing: .04em; margin-bottom: 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field label { font-size: 12px; color: #94a3b8; }
+  .field input[type=text], .field select, .field input[type=time] {
+    background: #0b1220; border: 1px solid #263449; color: #e2e8f0;
+    border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: inherit;
+  }
+  .field input:focus, .field select:focus, textarea:focus { outline: 2px solid #00a88455; border-color: #00a884; }
+  .checks { display: flex; gap: 16px; flex-wrap: wrap; margin: 6px 0 12px; }
+  .checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #cbd5e1; cursor: pointer; }
+  textarea#script {
+    width: 100%; height: 260px; background: #0b1220; color: #e2e8f0;
+    border: 1px solid #263449; border-radius: 10px; padding: 12px; font-size: 14px;
+    font-family: inherit; resize: vertical; line-height: 1.7; direction: rtl;
+  }
+  .help {
+    background: #0b1220; border: 1px dashed #263449; border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; color: #94a3b8; line-height: 1.9; margin-top: 10px;
+  }
+  .help code { background: #1e293b; color: #7dd3fc; padding: 1px 6px; border-radius: 5px; font-family: Menlo, monospace; direction: ltr; unicode-bidi: embed; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  button {
+    border: 0; border-radius: 9px; padding: 10px 16px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: filter .15s;
+  }
+  button:hover { filter: brightness(1.12); }
+  .btn-primary { background: #00a884; color: #fff; }
+  .btn-sec { background: #1e293b; color: #e2e8f0; }
+  .btn-warn { background: #7c2d12; color: #fed7aa; }
+  .speed-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: #94a3b8; }
+  .speed-row input[type=range] { flex: 1; accent-color: #00a884; }
+  .file-note { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+  /* ---------- הטלפון ---------- */
+  .stage { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-inline: auto; }
+  .phone-frame {
+    padding: 10px; background: #0a0a0a; border-radius: 44px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5), inset 0 0 0 2px #262626;
+    position: relative;
+  }
+  .phone-frame.no-frame { padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
+  .phone-frame.no-frame .punch { display: none; }
+  .phone-frame.no-frame #phone { border-radius: 0; }
+  .punch {
+    position: absolute; top: 18px; left: 50%; transform: translateX(-50%);
+    width: 12px; height: 12px; background: #000; border-radius: 50%; z-index: 50;
+    box-shadow: inset 0 0 2px 1px #1a2b33;
+  }
+
+  /* משתני ערכת נושא של וואטסאפ — מצב בהיר */
+  #phone {
+    --wa-wallpaper: #efeae2;
+    --wa-doodle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23163d33' stroke-opacity='.055' stroke-width='2'%3E%3Ccircle cx='24' cy='28' r='7'/%3E%3Cpath d='M120 20l5 10 10 2-8 7 2 11-9-5-9 5 2-11-8-7 10-2z'/%3E%3Cpath d='M30 110c8-10 20-10 28 0'/%3E%3Crect x='108' y='104' width='16' height='16' rx='4' transform='rotate(12 116 112)'/%3E%3Cpath d='M70 60q6-12 12 0t12 0'/%3E%3Ccircle cx='140' cy='70' r='4'/%3E%3Cpath d='M14 70l8 8m0-8l-8 8'/%3E%3Cpath d='M60 140a8 8 0 1016 0 8 8 0 10-16 0'/%3E%3C/g%3E%3C/svg%3E");
+    --wa-out: #d9fdd3;
+    --wa-in: #ffffff;
+    --wa-text: #111b21;
+    --wa-time: #667781;
+    --wa-out-time: #5b7562;
+    --wa-header-bg: #ffffff;
+    --wa-header-text: #111b21;
+    --wa-sub: #667781;
+    --wa-icon: #54656f;
+    --wa-bar-bg: #f0f2f5;
+    --wa-input-bg: #ffffff;
+    --wa-input-ph: #8696a0;
+    --wa-chip-bg: #ffffff;
+    --wa-chip-text: #54656f;
+    --wa-e2e-bg: #fbf4cb;
+    --wa-e2e-text: #54656f;
+    --wa-tick: #8696a0;
+    --wa-tick-read: #53bdeb;
+    --wa-green: #00a884;
+    --wa-shadow: 0 1px .5px rgba(11,20,26,.13);
+    --wa-avatar-bg: #dfe5e7;
+    --wa-avatar-icon: #ffffff;
+    width: 360px; height: 740px; border-radius: 34px; overflow: hidden;
+    display: flex; flex-direction: column; background: var(--wa-wallpaper);
+    position: relative; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  /* מצב כהה */
+  #phone.dark {
+    --wa-wallpaper: #0b141a;
+    --wa-doodle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23e9edef' stroke-opacity='.04' stroke-width='2'%3E%3Ccircle cx='24' cy='28' r='7'/%3E%3Cpath d='M120 20l5 10 10 2-8 7 2 11-9-5-9 5 2-11-8-7 10-2z'/%3E%3Cpath d='M30 110c8-10 20-10 28 0'/%3E%3Crect x='108' y='104' width='16' height='16' rx='4' transform='rotate(12 116 112)'/%3E%3Cpath d='M70 60q6-12 12 0t12 0'/%3E%3Ccircle cx='140' cy='70' r='4'/%3E%3Cpath d='M14 70l8 8m0-8l-8 8'/%3E%3Cpath d='M60 140a8 8 0 1016 0 8 8 0 10-16 0'/%3E%3C/g%3E%3C/svg%3E");
+    --wa-out: #005c4b;
+    --wa-in: #202c33;
+    --wa-text: #e9edef;
+    --wa-time: #8696a0;
+    --wa-out-time: #8fb5a7;
+    --wa-header-bg: #202c33;
+    --wa-header-text: #e9edef;
+    --wa-sub: #8696a0;
+    --wa-icon: #aebac1;
+    --wa-bar-bg: #202c33;
+    --wa-input-bg: #2a3942;
+    --wa-input-ph: #8696a0;
+    --wa-chip-bg: #182229;
+    --wa-chip-text: #8696a0;
+    --wa-e2e-bg: #182229;
+    --wa-e2e-text: #ffd279;
+    --wa-tick: #8696a0;
+    --wa-tick-read: #53bdeb;
+    --wa-shadow: 0 1px .5px rgba(0,0,0,.25);
+    --wa-avatar-bg: #6a7175;
+    --wa-avatar-icon: #cfd4d6;
+  }
+
+  /* שורת סטטוס */
+  .statusbar {
+    height: 30px; background: var(--wa-header-bg); color: var(--wa-header-text);
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 18px 3px; font-size: 12.5px; font-weight: 600; z-index: 10; flex: 0 0 auto;
+  }
+  .statusbar .sicons { display: flex; gap: 5px; align-items: center; }
+  .statusbar svg { display: block; }
+
+  /* כותרת הצ'אט */
+  .chat-header {
+    background: var(--wa-header-bg); color: var(--wa-header-text);
+    display: flex; align-items: center; gap: 8px; padding: 8px 6px 8px 10px;
+    box-shadow: 0 1px 3px rgba(11,20,26,.1); z-index: 10; flex: 0 0 auto;
+  }
+  .back-arrow { width: 24px; height: 24px; color: var(--wa-icon); flex: 0 0 auto; }
+  #phone[dir="ltr"] .back-arrow svg { transform: scaleX(-1); }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--wa-avatar-bg);
+    overflow: hidden; flex: 0 0 auto; display: grid; place-items: center;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar svg { width: 42px; height: 42px; margin-top: 8px; color: var(--wa-avatar-icon); }
+  .contact-block { flex: 1; min-width: 0; line-height: 1.25; }
+  .contact-name { font-size: 16.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact-status { font-size: 12.5px; color: var(--wa-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 15px; }
+  .header-icons { display: flex; align-items: center; gap: 4px; color: var(--wa-icon); flex: 0 0 auto; }
+  .header-icons .hbtn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; }
+
+  /* אזור ההודעות */
+  .chat-area {
+    flex: 1 1 auto; overflow-y: auto; position: relative;
+    background-color: var(--wa-wallpaper); background-image: var(--wa-doodle);
+    padding: 8px 14px 10px; display: flex; flex-direction: column;
+    scrollbar-width: none;
+  }
+  .chat-area::-webkit-scrollbar { display: none; }
+  .chip {
+    align-self: center; background: var(--wa-chip-bg); color: var(--wa-chip-text);
+    font-size: 12.5px; padding: 5px 12px; border-radius: 8px; margin: 8px 0 6px;
+    box-shadow: var(--wa-shadow); text-align: center;
+  }
+  .chip.e2e { background: var(--wa-e2e-bg); color: var(--wa-e2e-text); max-width: 85%; line-height: 1.45; font-size: 12px; }
+
+  .msg-row { display: flex; margin-top: 2px; padding: 1px 0; }
+  .msg-row.first-of-group { margin-top: 10px; }
+  .msg-row.out { justify-content: flex-end; }
+  .msg-row.in  { justify-content: flex-start; }
+  .bubble {
+    position: relative; max-width: 78%; border-radius: 8px;
+    padding: 6px 8px 7px 8px; box-shadow: var(--wa-shadow);
+    font-size: 14.2px; line-height: 19px; color: var(--wa-text);
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { transform: scale(.92) translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .static-mode .bubble { animation: none; }
+  .out .bubble { background: var(--wa-out); }
+  .in  .bubble { background: var(--wa-in); }
+  .first-of-group .out .bubble, .msg-row.out.first-of-group .bubble { border-start-end-radius: 0; }
+  .msg-row.in.first-of-group .bubble { border-start-start-radius: 0; }
+
+  .tail { position: absolute; top: 0; width: 8px; height: 13px; }
+  .tail svg { display: block; width: 8px; height: 13px; }
+  .out .tail { inset-inline-end: -8px; color: var(--wa-out); }
+  .in  .tail { inset-inline-start: -8px; color: var(--wa-in); }
+  /* הזנב מצויר כשהוא פונה ימינה; משקפים לפי צד פיזי */
+  #phone[dir="rtl"] .out .tail svg { transform: scaleX(-1); }
+  #phone[dir="ltr"] .in  .tail svg { transform: scaleX(-1); }
+
+  .msg-text { white-space: pre-wrap; word-wrap: break-word; unicode-bidi: plaintext; }
+  .msg-text.emoji-only { font-size: 32px; line-height: 38px; }
+  .meta {
+    float: left; margin: 6px 0 -4px 0; margin-inline-start: 10px;
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; color: var(--wa-time); position: relative; top: 4px;
+    direction: ltr; user-select: none;
+  }
+  #phone[dir="ltr"] .meta { float: right; }
+  .out .meta { color: var(--wa-out-time); }
+  .ticks { display: inline-flex; width: 16px; height: 11px; color: var(--wa-tick); }
+  .ticks.read { color: var(--wa-tick-read); }
+  .ticks svg { display: block; }
+
+  /* הודעת תמונה */
+  .bubble.image-bubble { padding: 3px; }
+  .bubble.image-bubble img { display: block; width: 100%; max-width: 240px; border-radius: 6px; }
+  .image-bubble .meta-overlay {
+    position: absolute; bottom: 6px; inset-inline-end: 8px;
+    display: inline-flex; align-items: center; gap: 3px; direction: ltr;
+    font-size: 11px; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,.7);
+  }
+  .image-bubble .meta-overlay .ticks { color: #fff; }
+  .image-bubble .meta-overlay .ticks.read { color: var(--wa-tick-read); }
+
+  /* הודעה קולית */
+  .voice { display: flex; align-items: center; gap: 8px; min-width: 210px; padding: 4px 2px 6px; }
+  .voice .v-avatar { position: relative; width: 42px; height: 42px; flex: 0 0 auto; }
+  .voice .v-avatar .avatar { width: 42px; height: 42px; }
+  .voice .v-avatar .mic-badge {
+    position: absolute; bottom: -2px; inset-inline-end: -4px; width: 17px; height: 17px;
+    color: var(--wa-green);
+  }
+  .voice .play { width: 30px; height: 30px; color: var(--wa-time); flex: 0 0 auto; }
+  .voice .wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 26px; }
+  .voice .wave i { width: 3px; border-radius: 2px; background: var(--wa-time); opacity: .55; }
+  .voice-meta { font-size: 11px; color: var(--wa-time); margin-top: 2px; padding: 0 6px; display: flex; justify-content: space-between; direction: ltr; }
+  .out .voice-meta { color: var(--wa-out-time); }
+
+  /* חיווי הקלדה */
+  .typing-bubble { display: inline-flex; gap: 4px; align-items: center; padding: 4px 2px; }
+  .typing-bubble i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--wa-time);
+    opacity: .4; animation: blink 1.2s infinite;
+  }
+  .typing-bubble i:nth-child(2) { animation-delay: .2s; }
+  .typing-bubble i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+
+  /* שורת הקלט */
+  .input-bar {
+    flex: 0 0 auto; display: flex; align-items: flex-end; gap: 6px;
+    padding: 6px 8px 10px; background: transparent; z-index: 10;
+  }
+  .fake-input {
+    flex: 1; background: var(--wa-input-bg); border-radius: 24px; min-height: 44px;
+    display: flex; align-items: center; gap: 10px; padding: 0 6px 0 12px;
+    box-shadow: var(--wa-shadow); color: var(--wa-input-ph);
+  }
+  .fake-input .ph { flex: 1; font-size: 15px; }
+  .fake-input svg { color: var(--wa-icon); flex: 0 0 auto; }
+  .mic-btn {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--wa-green);
+    display: grid; place-items: center; color: #fff; flex: 0 0 auto;
+    box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  }
+  .footer-note { font-size: 12px; color: #475569; text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo">💬</div>
+  <div>
+    <h1>WhatsApp Animator</h1>
+    <div class="sub">סימולטור שיחות וואטסאפ — תצוגה מדויקת, אנימציה מלאה, הכל אצלנו</div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ======== פאנל עריכה ======== -->
+  <div class="panel">
+    <h2>הגדרות שיחה</h2>
+    <div class="grid2">
+      <div class="field">
+        <label for="contactName">שם איש הקשר</label>
+        <input type="text" id="contactName" value="ירדן">
+      </div>
+      <div class="field">
+        <label for="statusMode">סטטוס בכותרת</label>
+        <select id="statusMode">
+          <option value="online" selected>מחובר/ת</option>
+          <option value="lastseen">נראה לאחרונה היום ב־14:05</option>
+          <option value="none">ללא סטטוס</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="clockTime">שעה בשורת הסטטוס</label>
+        <input type="text" id="clockTime" value="21:34">
+      </div>
+      <div class="field">
+        <label for="startTime">שעת ההודעה הראשונה</label>
+        <input type="text" id="startTime" value="21:28">
+      </div>
+      <div class="field">
+        <label for="avatarFile">תמונת פרופיל</label>
+        <input type="file" id="avatarFile" accept="image/*">
+      </div>
+      <div class="field">
+        <label for="chatImages">תמונות לשליחה בצ'אט</label>
+        <input type="file" id="chatImages" accept="image/*" multiple>
+        <div class="file-note">בתסריט: <b>תמונה 1</b>, <b>תמונה 2</b>…</div>
+      </div>
+    </div>
+
+    <div class="checks">
+      <label><input type="checkbox" id="darkMode"> מצב כהה</label>
+      <label><input type="checkbox" id="phoneRtl" checked> טלפון בעברית (RTL)</label>
+      <label><input type="checkbox" id="showFrame" checked> מסגרת טלפון</label>
+      <label><input type="checkbox" id="soundOn" checked> צלילים</label>
+      <label><input type="checkbox" id="showE2E" checked> הודעת הצפנה</label>
+    </div>
+
+    <h2>תסריט השיחה</h2>
+    <textarea id="script" spellcheck="false"># היום
+&lt; אחי, ראית מה בניתי? @21:28
+&gt; מה בנית עכשיו? 😄
+&lt; סימולטור וואטסאפ משלנו. בלי ווטרמארק, בלי הגבלות
+&gt; נראה אמיתי אחד לאחד 🔥
+&lt; קול 0:12
+&gt; שלח לי את הקובץ
+&lt; בדרך אליך
+&gt; 👑</textarea>
+
+    <div class="help">
+      <b>תחביר:</b><br>
+      <code>&gt;</code> הודעה יוצאת (שלי) &nbsp;·&nbsp; <code>&lt;</code> הודעה נכנסת<br>
+      <code># טקסט</code> תגית תאריך (למשל <code># היום</code>)<br>
+      <code>@21:45</code> בסוף שורה — קובע שעה להודעה<br>
+      <code>קול 0:12</code> הודעה קולית &nbsp;·&nbsp; <code>תמונה 1</code> תמונה שהועלתה
+    </div>
+
+    <div class="btns">
+      <button class="btn-primary" id="btnPlay">▶ נגן אנימציה</button>
+      <button class="btn-sec" id="btnStatic">תצוגה מלאה</button>
+      <button class="btn-warn" id="btnStop">⏹ עצור</button>
+      <button class="btn-sec" id="btnPng">📸 הורד PNG</button>
+    </div>
+    <div class="speed-row">
+      <span>מהירות</span>
+      <input type="range" id="speed" min="0.5" max="3" step="0.25" value="1">
+      <span id="speedVal">×1</span>
+    </div>
+  </div>
+
+  <!-- ======== הטלפון ======== -->
+  <div class="stage">
+    <div class="phone-frame" id="phoneFrame">
+      <div class="punch"></div>
+      <div id="phone" dir="rtl">
+
+        <div class="statusbar">
+          <span id="sbClock">21:34</span>
+          <span class="sicons">
+            <!-- wifi -->
+            <svg width="15" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 9.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM8 5c-1.9 0-3.6.7-4.9 1.9l1.4 1.4A5 5 0 018 7c1.3 0 2.5.5 3.5 1.3l1.4-1.4A6.9 6.9 0 008 5zm0-5C5 0 2.2 1.1 0 3l1.4 1.4A8.9 8.9 0 018 2c2.5 0 4.8.9 6.6 2.4L16 3c-2.2-1.9-5-3-8-3z"/></svg>
+            <!-- signal -->
+            <svg width="15" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M0 12h2.5V8H0v4zm4.5 0H7V5H4.5v7zM9 12h2.5V2.5H9V12zm4.5 0H16V0h-2.5v12z"/></svg>
+            <!-- battery -->
+            <svg width="22" height="11" viewBox="0 0 24 12" fill="currentColor"><rect x="0" y="0" width="21" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="2" width="13" height="8" rx="1"/><rect x="22" y="3.5" width="2" height="5" rx="1"/></svg>
+          </span>
+        </div>
+
+        <div class="chat-header">
+          <span class="back-arrow"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.4 5.4 8.8 12l6.6 6.6 1.4-1.4-5.2-5.2 5.2-5.2z"/></svg></span>
+          <span class="avatar" id="headerAvatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm0 2.2c-3.6 0-9 1.8-9 5.4V22h18v-2.4c0-3.6-5.4-5.4-9-5.4z"/></svg></span>
+          <div class="contact-block">
+            <div class="contact-name" id="hdrName">ירדן</div>
+            <div class="contact-status" id="hdrStatus">מחובר/ת</div>
+          </div>
+          <div class="header-icons">
+            <span class="hbtn"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg></span>
+            <span class="hbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 006.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.9 21 3 13.1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .7-.2 1l-2.3 2.2z"/></svg></span>
+            <span class="hbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg></span>
+          </div>
+        </div>
+
+        <div class="chat-area" id="chatArea"></div>
+
+        <div class="input-bar">
+          <div class="fake-input">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-3.5 7a1.3 1.3 0 110-2.6 1.3 1.3 0 010 2.6zm7 0a1.3 1.3 0 110-2.6 1.3 1.3 0 010 2.6zM12 18a5.9 5.9 0 01-5.5-4h11A5.9 5.9 0 0112 18z"/></svg>
+            <span class="ph">הודעה</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(45deg)"><path d="M16.5 6.4L8 14.9a1.7 1.7 0 002.4 2.4l8.2-8.2a3.4 3.4 0 10-4.8-4.8L5.3 12.8a5.1 5.1 0 007.2 7.2l7.6-7.6-1.2-1.2-7.6 7.6a3.4 3.4 0 01-4.8-4.8l8.5-8.5a1.7 1.7 0 012.4 2.4l-8.2 8.2a.2.2 0 01-.2-.2l7-7-1.5-1.5z"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4zM9 3L7.2 5H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-3.2L15 3H9zm3 15a6 6 0 110-12 6 6 0 010 12z"/></svg>
+          </div>
+          <span class="mic-btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.9V21h2v-3.1A7 7 0 0019 11h-2z"/></svg></span>
+        </div>
+
+      </div>
+    </div>
+    <div class="footer-note">להקלטת וידאו: ⌘⇧5 והקלטת אזור המסך של הטלפון בזמן האנימציה</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script>
+/* ============ עזרים ============ */
+const $ = id => document.getElementById(id);
+const phone = $('phone'), chatArea = $('chatArea');
+let timers = [], playing = false, chatImageURLs = [];
+
+const sleep = (ms) => new Promise(res => { const t = setTimeout(res, ms); timers.push(t); });
+const speedFactor = () => parseFloat($('speed').value);
+
+/* ---- SVG משותפים ---- */
+const TAIL_SVG = `<svg viewBox="0 0 8 13"><path fill="currentColor" d="M0 0h5.2C6.9 0 7.5 1.2 6.5 2.6L0 11.2V0z"/></svg>`;
+const TICK1 = `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.5,6 6,8.5 12,2.5"/></svg>`;
+const TICK2 = `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,6 3.5,8.5 9.5,2.5"/><polyline points="7,6.7 8.8,8.5 15,2.5"/></svg>`;
+const PLAY_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+const MIC_BADGE = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 003-3V5a3 3 0 10-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.9V21h2v-3.1A7 7 0 0019 11h-2z"/></svg>`;
+const PERSON_SVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4.5 4.5 0 100-9 4.5 4.5 0 000 9zm0 2.2c-3.6 0-9 1.8-9 5.4V22h18v-2.4c0-3.6-5.4-5.4-9-5.4z"/></svg>`;
+
+/* ---- צלילים (WebAudio, בלי קבצים) ---- */
+let audioCtx = null;
+function beep(freqs, dur = 0.09, gainV = 0.12) {
+  if (!$('soundOn').checked) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    freqs.forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, audioCtx.currentTime + i * dur);
+      g.gain.linearRampToValueAtTime(gainV, audioCtx.currentTime + i * dur + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (i + 1) * dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(audioCtx.currentTime + i * dur); o.stop(audioCtx.currentTime + (i + 1) * dur + 0.05);
+    });
+  } catch (e) { /* אין אודיו — ממשיכים בשקט */ }
+}
+const soundSend = () => beep([880, 660]);
+const soundReceive = () => beep([523, 784]);
+
+/* ============ ניתוח התסריט ============ */
+function parseTime(str) { const m = str.match(/^(\d{1,2}):(\d{2})$/); return m ? { h: +m[1], mnt: +m[2] } : null; }
+function fmtTime(t) { return `${t.h}:${String(t.mnt).padStart(2, '0')}`; }
+function addMinutes(t, n) { let total = t.h * 60 + t.mnt + n; total %= 1440; return { h: Math.floor(total / 60), mnt: total % 60 }; }
+
+function parseScript() {
+  const lines = $('script').value.split('\n');
+  let cur = parseTime($('startTime').value.trim()) || { h: 21, mnt: 28 };
+  const items = [];
+  let count = 0;
+  for (let raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('#')) { items.push({ type: 'date', text: line.slice(1).trim() || 'היום' }); continue; }
+    const side = line.startsWith('>') ? 'out' : line.startsWith('<') ? 'in' : null;
+    if (!side) continue;
+    let text = line.slice(1).trim();
+    const tm = text.match(/@(\d{1,2}:\d{2})\s*$/);
+    if (tm) { cur = parseTime(tm[1]) || cur; text = text.replace(/@\d{1,2}:\d{2}\s*$/, '').trim(); }
+    else if (count > 0 && count % 2 === 0) cur = addMinutes(cur, 1);
+    let item = { type: 'msg', side, time: fmtTime(cur), kind: 'text', text };
+    const vm = text.match(/^(?:קול|voice)\s+(\d+:\d{2})$/);
+    const im = text.match(/^(?:תמונה|image)\s+(\d+)$/);
+    if (vm) { item.kind = 'voice'; item.dur = vm[1]; }
+    else if (im) { item.kind = 'image'; item.imgIdx = +im[1] - 1; }
+    items.push(item); count++;
+  }
+  return items;
+}
+
+/* ============ רינדור הודעות ============ */
+function isEmojiOnly(t) {
+  const stripped = t.replace(/[\p{Extended_Pictographic}\p{Emoji_Component}‍️\s]/gu, '');
+  return stripped === '' && t.trim().length > 0 && [...t.trim()].length <= 6;
+}
+function ticksHTML(state) { return `<span class="ticks ${state === 'read' ? 'read' : ''}">${state === 'sent' ? TICK1 : TICK2}</span>`; }
+
+function avatarHTML() {
+  const img = $('headerAvatar').querySelector('img');
+  return `<span class="avatar">${img ? `<img src="${img.src}">` : PERSON_SVG}</span>`;
+}
+
+function buildMsg(item, prevItem, opts = {}) {
+  const row = document.createElement('div');
+  const firstOfGroup = !prevItem || prevItem.type !== 'msg' || prevItem.side !== item.side;
+  row.className = `msg-row ${item.side}${firstOfGroup ? ' first-of-group' : ''}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  const tickState = opts.tickState || 'read';
+  const metaHTML = `<span class="meta">${item.side === 'out' ? ticksHTML(tickState) : ''}<span>${item.time}</span></span>`;
+
+  if (item.kind === 'image' && chatImageURLs[item.imgIdx]) {
+    bubble.classList.add('image-bubble');
+    bubble.innerHTML = `<img src="${chatImageURLs[item.imgIdx]}">
+      <span class="meta-overlay">${item.side === 'out' ? ticksHTML(tickState) : ''}<span>${item.time}</span></span>`;
+  } else if (item.kind === 'voice') {
+    const bars = Array.from({ length: 28 }, () => `<i style="height:${4 + ((Math.sin(Math.random() * 9) + 1) * 9 | 0)}px"></i>`).join('');
+    bubble.innerHTML = `
+      <div class="voice">
+        <span class="play">${PLAY_SVG}</span>
+        <span class="wave">${bars}</span>
+        <span class="v-avatar">${avatarHTML()}<span class="mic-badge">${MIC_BADGE}</span></span>
+      </div>
+      <div class="voice-meta"><span>${item.dur}</span>${metaHTML}</div>`;
+  } else {
+    const cls = isEmojiOnly(item.text) ? 'msg-text emoji-only' : 'msg-text';
+    bubble.innerHTML = `<span class="${cls}">${escapeHTML(item.text)}</span>${metaHTML}`;
+  }
+  if (firstOfGroup && item.kind !== 'image') {
+    const tail = document.createElement('span');
+    tail.className = 'tail'; tail.innerHTML = TAIL_SVG;
+    bubble.appendChild(tail);
+  }
+  row.appendChild(bubble);
+  return row;
+}
+function escapeHTML(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function buildChip(text, e2e = false) {
+  const d = document.createElement('div');
+  d.className = 'chip' + (e2e ? ' e2e' : '');
+  d.textContent = text;
+  return d;
+}
+function scrollBottom() { chatArea.scrollTop = chatArea.scrollHeight; }
+
+function clearChat() {
+  stopPlayback();
+  chatArea.innerHTML = '';
+  if ($('showE2E').checked) chatArea.appendChild(buildChip('🔒 ההודעות והשיחות מוצפנות מקצה לקצה. איש מחוץ לצ׳אט הזה, גם לא WhatsApp, לא יכול לקרוא אותן או להאזין להן.', true));
+}
+
+/* ============ מצב סטטי ============ */
+function renderStatic() {
+  clearChat();
+  phone.classList.add('static-mode');
+  const items = parseScript();
+  let prev = null;
+  for (const item of items) {
+    if (item.type === 'date') { chatArea.appendChild(buildChip(item.text)); prev = item; continue; }
+    chatArea.appendChild(buildMsg(item, prev, { tickState: 'read' }));
+    prev = item;
+  }
+  setHeaderStatus('idle');
+  scrollBottom();
+}
+
+/* ============ נגינת אנימציה ============ */
+function setHeaderStatus(mode) {
+  const el = $('hdrStatus');
+  if (mode === 'typing') { el.textContent = 'מקליד/ה...'; return; }
+  const sel = $('statusMode').value;
+  el.textContent = sel === 'online' ? 'מחובר/ת' : sel === 'lastseen' ? 'נראה לאחרונה היום ב־14:05' : '';
+}
+
+function stopPlayback() {
+  playing = false;
+  timers.forEach(clearTimeout); timers = [];
+  const t = chatArea.querySelector('.typing-row'); if (t) t.remove();
+  setHeaderStatus('idle');
+}
+
+async function play() {
+  clearChat();
+  phone.classList.remove('static-mode');
+  playing = true;
+  const items = parseScript();
+  let prev = null;
+  const pendingTicks = [];
+
+  const markDelivered = () => pendingTicks.splice(0).forEach(el => { el.classList.remove('read'); el.innerHTML = TICK2; el.dataset.state = 'del'; scheduleRead(el); });
+  const scheduleRead = (el) => { const t = setTimeout(() => { if (el.isConnected) el.classList.add('read'); }, 1400 / speedFactor()); timers.push(t); };
+
+  for (const item of items) {
+    if (!playing) return;
+    if (item.type === 'date') { chatArea.appendChild(buildChip(item.text)); scrollBottom(); prev = item; continue; }
+
+    if (item.side === 'in') {
+      /* חיווי הקלדה */
+      const typeMs = Math.min(900 + (item.text?.length || 10) * 55, 3200) / speedFactor();
+      await sleep(500 / speedFactor()); if (!playing) return;
+      setHeaderStatus('typing');
+      const typingRow = document.createElement('div');
+      typingRow.className = 'msg-row in first-of-group typing-row';
+      typingRow.innerHTML = `<div class="bubble"><span class="typing-bubble"><i></i><i></i><i></i></span></div>`;
+      chatArea.appendChild(typingRow); scrollBottom();
+      await sleep(typeMs); if (!playing) return;
+      typingRow.remove();
+      setHeaderStatus('idle');
+      chatArea.appendChild(buildMsg(item, prev, { tickState: 'read' }));
+      soundReceive();
+    } else {
+      const waitMs = Math.min(700 + (item.text?.length || 10) * 42, 2800) / speedFactor();
+      await sleep(waitMs); if (!playing) return;
+      const row = buildMsg(item, prev, { tickState: 'sent' });
+      chatArea.appendChild(row);
+      soundSend();
+      const tickEl = row.querySelector('.ticks');
+      if (tickEl) { tickEl.classList.remove('read'); tickEl.innerHTML = TICK1; pendingTicks.push(tickEl); const t = setTimeout(markDelivered, 700 / speedFactor()); timers.push(t); }
+    }
+    scrollBottom();
+    prev = item;
+  }
+  playing = false;
+}
+
+/* ============ ייצוא PNG ============ */
+async function exportPNG() {
+  if (typeof html2canvas === 'undefined') { alert('ייצוא PNG דורש חיבור לאינטרנט (טעינת html2canvas). אפשר פשוט לצלם מסך: ⌘⇧4'); return; }
+  const canvas = await html2canvas($('phoneFrame'), { scale: 2, backgroundColor: null, useCORS: true });
+  const a = document.createElement('a');
+  a.download = 'whatsapp-chat.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+/* ============ חיבור הפקדים ============ */
+$('btnStatic').onclick = renderStatic;
+$('btnPlay').onclick = () => { stopPlayback(); play(); };
+$('btnStop').onclick = stopPlayback;
+$('btnPng').onclick = exportPNG;
+$('speed').oninput = () => $('speedVal').textContent = '×' + $('speed').value;
+$('darkMode').onchange = e => phone.classList.toggle('dark', e.target.checked);
+$('phoneRtl').onchange = e => phone.setAttribute('dir', e.target.checked ? 'rtl' : 'ltr');
+$('showFrame').onchange = e => $('phoneFrame').classList.toggle('no-frame', !e.target.checked);
+$('contactName').oninput = e => $('hdrName').textContent = e.target.value || ' ';
+$('statusMode').onchange = () => setHeaderStatus('idle');
+$('clockTime').oninput = e => $('sbClock').textContent = e.target.value;
+$('avatarFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  $('headerAvatar').innerHTML = `<img src="${URL.createObjectURL(f)}">`;
+};
+$('chatImages').onchange = e => {
+  chatImageURLs = [...e.target.files].map(f => URL.createObjectURL(f));
+};
+$('showE2E').onchange = renderStatic;
+
+/* פתיחה: תצוגה סטטית של תסריט הדוגמה */
+renderStatic();
+</script>
+</body>
+</html>
