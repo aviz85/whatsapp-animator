@@ -297,8 +297,16 @@
     <h2>הגדרות שיחה</h2>
     <div class="grid2">
       <div class="field">
-        <label for="contactName">שם איש הקשר</label>
+        <label for="contactName">שם איש הקשר / הקבוצה</label>
         <input type="text" id="contactName" value="ירדן">
+      </div>
+      <div class="field">
+        <label for="chatType">סוג שיחה</label>
+        <select id="chatType">
+          <option value="auto" selected>אוטומטי (לפי התסריט)</option>
+          <option value="private">שיחה פרטית</option>
+          <option value="group">קבוצה</option>
+        </select>
       </div>
       <div class="field">
         <label for="statusMode">סטטוס בכותרת</label>
@@ -502,7 +510,9 @@ function parseScript() {
     items.push(item); count++;
   }
   groupSenders = [...new Set(items.filter(i => i.sender).map(i => i.sender))];
-  groupMode = groupSenders.length > 0;
+  /* בורר ידני גובר על הזיהוי האוטומטי */
+  const chatType = $('chatType').value;
+  groupMode = chatType === 'group' ? true : chatType === 'private' ? false : groupSenders.length > 0;
   return items;
 }
 
@@ -601,7 +611,10 @@ function renderStatic() {
 function setHeaderStatus(mode, sender) {
   const el = $('hdrStatus');
   if (mode === 'typing') { el.textContent = (groupMode && sender ? sender + ' ' : '') + 'מקליד/ה...'; return; }
-  if (groupMode) { el.textContent = ['אתה', ...groupSenders].join(', '); return; }
+  if (groupMode) {
+    el.textContent = groupSenders.length ? ['אתה', ...groupSenders].join(', ') : 'הקש/י כאן למידע על הקבוצה';
+    return;
+  }
   const sel = $('statusMode').value;
   el.textContent = sel === 'online' ? 'מחובר/ת' : sel === 'lastseen' ? 'נראה לאחרונה היום ב־14:05' : '';
 }
@@ -764,6 +777,7 @@ $('phoneRtl').onchange = e => phone.setAttribute('dir', e.target.checked ? 'rtl'
 $('showFrame').onchange = e => $('phoneFrame').classList.toggle('no-frame', !e.target.checked);
 $('contactName').oninput = e => $('hdrName').textContent = e.target.value || ' ';
 $('statusMode').onchange = () => setHeaderStatus('idle');
+$('chatType').onchange = renderStatic;
 $('clockTime').oninput = e => $('sbClock').textContent = e.target.value;
 $('avatarFile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
