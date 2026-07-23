@@ -789,6 +789,14 @@ $('chatImages').onchange = e => {
 };
 $('showE2E').onchange = renderStatic;
 
+/* רינדור חי: כל שינוי בתסריט או בהגדרות מתעדכן מיד (בלי להפריע לאנימציה רצה) */
+const debounce = (fn, ms = 180) => { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
+const liveRender = debounce(() => { if (!playing) renderStatic(); });
+$('script').addEventListener('input', liveRender);
+$('startTime').addEventListener('input', liveRender);
+$('chatImages').addEventListener('change', liveRender);
+$('contactName').addEventListener('input', liveRender);
+
 /* פתיחה: תצוגה סטטית של תסריט הדוגמה */
 $('fmtLabel').textContent = pickRecordingFormat().ext;
 renderStatic();
