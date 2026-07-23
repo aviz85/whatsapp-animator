@@ -21,3 +21,10 @@ Thumbs.db
 # Scratch
 tmp-*
 *.log
+
+# Local-only (public repo keeps it clean)
+.wolf/
+.claude/
+CLAUDE.md
+shot-light.png
+shot-dark.png

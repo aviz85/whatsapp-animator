@@ -1,6 +1,10 @@
 # WhatsApp Animator 💬
 
-סימולטור שיחות וואטסאפ משלנו — תצוגה מדויקת אחד־לאחד, אנימציה מלאה, בלי ווטרמארק ובלי תלות בכלים חיצוניים.
+סימולטור שיחות וואטסאפ — תצוגה מדויקת אחד־לאחד, אנימציה מלאה, ייצוא PNG ווידאו. קובץ HTML אחד, בלי ווטרמארק, בלי שרת, בלי תלות בכלים חיצוניים.
+
+A pixel-accurate WhatsApp chat simulator & animator in a single HTML file — script-driven conversations, live typing animation with sounds, light/dark mode, full RTL (Hebrew) support, PNG & video export. No watermark, no server, no dependencies.
+
+![WhatsApp Animator — מצב בהיר וכהה](screenshot.png)
 
 ## שימוש
 
